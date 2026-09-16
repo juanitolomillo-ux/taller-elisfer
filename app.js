@@ -210,16 +210,24 @@ function loadLogo() {
 
 
 // ---------- TRABAJOS DINÁMICOS ----------
+function autoResizeTextarea(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.max(el.scrollHeight, 42) + 'px';
+}
+
 function addTrabajo(texto = '') {
   const list = document.getElementById('trabajosList');
   const div = document.createElement('div');
   div.className = 'trabajo-item';
   div.innerHTML = `
-    <input type="text" class="trabajo-texto" placeholder="Ej: Diagnóstico computarizado — Escaneo completo del sistema..." value="${texto.replace(/"/g, '&quot;')}">
+    <textarea class="trabajo-texto" rows="1" placeholder="Ej: Diagnóstico computarizado — Escaneo completo del sistema...">${texto.replace(/</g, '&lt;')}</textarea>
     <button type="button" class="btn-remove" title="Eliminar">×</button>
   `;
+  const ta = div.querySelector('.trabajo-texto');
+  ta.addEventListener('input', () => autoResizeTextarea(ta));
   div.querySelector('.btn-remove').addEventListener('click', () => div.remove());
   list.appendChild(div);
+  if (texto) setTimeout(() => autoResizeTextarea(ta), 0);
 }
 
 function getTrabajos() {
@@ -233,7 +241,7 @@ function addRepuesto(desc = '', cant = 1, valor = 0) {
   const tbody = document.getElementById('repuestosBody');
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td><input type="text" class="rep-desc" placeholder="Descripción del repuesto" value="${desc.replace(/"/g, '&quot;')}"></td>
+    <td><textarea class="rep-desc" rows="1" placeholder="Descripción del repuesto">${desc.replace(/</g, '&lt;')}</textarea></td>
     <td><input type="number" class="rep-cant" min="1" step="1" value="${cant}"></td>
     <td><input type="number" class="rep-valor" min="0" step="100" value="${valor}"></td>
     <td><input type="number" class="rep-total" readonly value="${cant * valor}"></td>
@@ -257,6 +265,10 @@ function addRepuesto(desc = '', cant = 1, valor = 0) {
     tr.remove();
     calcularTotales();
   });
+
+  const descTa = tr.querySelector('.rep-desc');
+  descTa.addEventListener('input', () => autoResizeTextarea(descTa));
+  if (desc) setTimeout(() => autoResizeTextarea(descTa), 0);
 
   tbody.appendChild(tr);
   calcularTotales();
@@ -769,10 +781,10 @@ function generarPDF() {
   doc.text('TOTAL', lx, y + boxH - 3.5);
   doc.text('$ ' + formatCLP(datos.total), vx, y + boxH - 3.5, { align: 'right' });
 
-  // ===== OBSERVACIONES =====
-  let obsY = y + 4;
+  // ===== OBSERVACIONES (ancho completo, debajo de los totales) =====
+  let obsY = y + boxH + 8;
   if (datos.observaciones) {
-    if (obsY > 240) { doc.addPage(); obsY = 20; }
+    if (obsY > 245) { doc.addPage(); obsY = 20; }
 
     doc.setTextColor(...primary);
     doc.setFont('helvetica', 'bold');
@@ -786,12 +798,14 @@ function generarPDF() {
     doc.setTextColor(...dark);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    const obsLines = doc.splitTextToSize(datos.observaciones, pageW - m * 2 - boxW - 10);
+    // Ancho completo de la hoja
+    const obsLines = doc.splitTextToSize(datos.observaciones, pageW - m * 2);
     doc.text(obsLines, m, obsY);
+    obsY += obsLines.length * 4 + 4;
   }
 
   // ===== FIRMAS =====
-  const firmaY = 268;
+  const firmaY = Math.min(Math.max(obsY + 12, 255), 268);
 
   doc.setDrawColor(180, 190, 200);
   doc.setLineWidth(0.4);
@@ -864,6 +878,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   ['costoDiagnostico', 'costoManoObra'].forEach(id => {
     document.getElementById(id).addEventListener('input', calcularTotales);
   });
+
+  // Observaciones: crecer hacia abajo al escribir
+  const obs = document.getElementById('observaciones');
+  if (obs) {
+    obs.addEventListener('input', () => autoResizeTextarea(obs));
+    autoResizeTextarea(obs);
+  }
 
   // Guardar datos de empresa al cambiar
   ['empresaNombre', 'empresaRut', 'empresaDireccion', 'empresaTel', 'empresaEmail'].forEach(id => {
