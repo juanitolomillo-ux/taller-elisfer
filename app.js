@@ -9,7 +9,7 @@ const CONFIG_KEY = 'taller_elisfer_config';
 // =====================================================
 // CONEXIÓN SUPABASE PERMANENTE (oculta al público)
 // =====================================================
-const SUPABASE_URL = 'https://kwgwsixsmppxibayxzor.supabase.co';
+const SUPABASE_URL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3Z3dzaXhzbXBweGliYXl4em9yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1OTE0NTYsImV4cCI6MjEwNTE2NzQ1Nn0.GMCXMDpvqBfycI9FXBeri-ixUae4U8h9MqqPXkcqKZg';
 const SUPABASE_ANON_KEY = 'sb_publishable_xgnq_OViYDFk-LPvaWrKWw_7f9pXH1I';
 
 let logoBase64 = null;
