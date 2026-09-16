@@ -5,38 +5,32 @@
 
 const STORAGE_KEY = 'taller_elisfer_ordenes';
 const CONFIG_KEY = 'taller_elisfer_config';
-const LOGO_KEY = 'taller_elisfer_logo';
-const SUPABASE_KEY = 'taller_elisfer_supabase';
+
+// =====================================================
+// CONEXIÓN SUPABASE PERMANENTE (oculta al público)
+// =====================================================
+const SUPABASE_URL = 'https://kwgwsixsmppxibayxzor.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_xgnq_0V1YDFk-LPvaWrKMw_7f9pXH1I';
 
 let logoBase64 = null;
 let ordenActualId = null;
 let supabaseClient = null;
 let useSupabase = false;
 
-// ---------- SUPABASE CONFIG ----------
-function getSupabaseConfig() {
+function initSupabase() {
+  if (!window.supabase) return false;
   try {
-    return JSON.parse(localStorage.getItem(SUPABASE_KEY) || '{}');
-  } catch {
-    return {};
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    useSupabase = true;
+    console.log('✅ Supabase conectado de forma permanente');
+    return true;
+  } catch (e) {
+    console.warn('Error al conectar Supabase:', e);
+    useSupabase = false;
+    return false;
   }
 }
 
-function initSupabase() {
-  const cfg = getSupabaseConfig();
-  if (cfg.url && cfg.anonKey && window.supabase) {
-    try {
-      supabaseClient = window.supabase.createClient(cfg.url, cfg.anonKey);
-      useSupabase = true;
-      console.log('✅ Supabase conectado');
-      return true;
-    } catch (e) {
-      console.warn('Error al conectar Supabase:', e);
-    }
-  }
-  useSupabase = false;
-  return false;
-}
 
 // ---------- UTILIDADES ----------
 function formatCLP(n) {
@@ -167,25 +161,33 @@ function loadConfig() {
   if (c.empresaDireccion) document.getElementById('empresaDireccion').value = c.empresaDireccion;
   if (c.empresaTel) document.getElementById('empresaTel').value = c.empresaTel;
   if (c.empresaEmail) document.getElementById('empresaEmail').value = c.empresaEmail;
-
-  const logo = localStorage.getItem(LOGO_KEY);
-  if (logo) {
-    logoBase64 = logo;
-    showLogo(logo);
-  }
-
-  // Cargar config Supabase en los inputs (si existen)
-  const sb = getSupabaseConfig();
-  const urlInput = document.getElementById('supabaseUrl');
-  const keyInput = document.getElementById('supabaseKey');
-  if (urlInput && sb.url) urlInput.value = sb.url;
-  if (keyInput && sb.anonKey) keyInput.value = sb.anonKey;
 }
 
-function showLogo(base64) {
-  const preview = document.getElementById('logoPreview');
-  preview.innerHTML = `<img src="${base64}" alt="Logo">`;
+// Carga automática del logo (archivo fijo: logo.png en la misma carpeta)
+function loadLogo() {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function () {
+    // Convertir a base64 para usarlo también en el PDF
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    try {
+      logoBase64 = canvas.toDataURL('image/png');
+    } catch (e) {
+      logoBase64 = 'logo.png'; // fallback por si hay CORS
+    }
+    const preview = document.getElementById('logoPreview');
+    if (preview) preview.innerHTML = `<img src="logo.png" alt="Logo">`;
+  };
+  img.onerror = function () {
+    console.log('No se encontró logo.png — se mostrará sin logo hasta que lo subas.');
+  };
+  img.src = 'logo.png';
 }
+
 
 // ---------- TRABAJOS DINÁMICOS ----------
 function addTrabajo(texto = '') {
@@ -805,55 +807,23 @@ function generarPDF() {
   doc.save(nombreArchivo);
 }
 
-// ---------- GUARDAR CONFIG SUPABASE ----------
-function guardarSupabaseConfig() {
-  const url = document.getElementById('supabaseUrl')?.value.trim() || '';
-  const key = document.getElementById('supabaseKey')?.value.trim() || '';
-
-  if (!url || !key) {
-    alert('Debes pegar la URL y la Publishable / anon key de Supabase.');
-    return;
-  }
-
-  localStorage.setItem(SUPABASE_KEY, JSON.stringify({ url, anonKey: key }));
-  const ok = initSupabase();
-  if (ok) {
-    alert('✅ Supabase conectado correctamente.\nDesde ahora todas las órdenes se guardarán en la nube.\n\nLos campos de configuración se ocultarán para que nadie los modifique.');
-    updateSupabaseUI();
-  } else {
-    alert('No se pudo conectar. Revisa la URL y la key.');
-    updateSupabaseUI();
-  }
-}
-
-function mostrarConfigSupabase() {
-  const configFields = document.getElementById('supabaseConfigFields');
-  const btnMostrar = document.getElementById('btnMostrarConfig');
-  if (configFields) configFields.style.display = 'block';
-  if (btnMostrar) btnMostrar.style.display = 'none';
-}
-
-
 // ---------- EVENTOS ----------
 document.addEventListener('DOMContentLoaded', async () => {
-  // Cargar librería supabase si no está
+  // Inicializar Supabase (conexión permanente, sin UI pública)
   if (!window.supabase) {
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    script.onload = () => {
-      initSupabase();
-      updateSupabaseUI();
-    };
+    script.onload = () => initSupabase();
     document.head.appendChild(script);
   } else {
     initSupabase();
   }
 
   loadConfig();
+  loadLogo();          // carga automática de logo.png
   await limpiarFormulario();
-  updateSupabaseUI();
 
-  // Botones
+  // Botones principales
   document.getElementById('btnAddTrabajo').addEventListener('click', () => addTrabajo());
   document.getElementById('btnAddRepuesto').addEventListener('click', () => addRepuesto());
   document.getElementById('btnGuardar').addEventListener('click', guardarOrden);
@@ -875,59 +845,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById(id).addEventListener('input', calcularTotales);
   });
 
-  // Logo
-  document.getElementById('logoInput').addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      logoBase64 = ev.target.result;
-      localStorage.setItem(LOGO_KEY, logoBase64);
-      showLogo(logoBase64);
-    };
-    reader.readAsDataURL(file);
-  });
-
-  // Guardar config empresa
+  // Guardar datos de empresa al cambiar
   ['empresaNombre', 'empresaRut', 'empresaDireccion', 'empresaTel', 'empresaEmail'].forEach(id => {
     document.getElementById(id).addEventListener('change', saveConfig);
   });
-
-  // Botón guardar Supabase
-  const btnSb = document.getElementById('btnGuardarSupabase');
-  if (btnSb) btnSb.addEventListener('click', guardarSupabaseConfig);
-
-  // Botón para volver a mostrar la config (solo tú lo verás si hace falta)
-  const btnMostrar = document.getElementById('btnMostrarConfig');
-  if (btnMostrar) btnMostrar.addEventListener('click', mostrarConfigSupabase);
 
   // Cerrar modal
   document.getElementById('modalBuscar').addEventListener('click', e => {
     if (e.target.id === 'modalBuscar') cerrarBuscador();
   });
 });
-
-function updateSupabaseUI() {
-  const status = document.getElementById('supabaseStatus');
-  const configFields = document.getElementById('supabaseConfigFields');
-  const btnMostrar = document.getElementById('btnMostrarConfig');
-
-  if (!status) return;
-
-  if (useSupabase) {
-    status.textContent = '🟢 Conectado a Supabase — Los datos se guardan en la nube';
-    status.style.color = '#16a34a';
-    // Ocultar campos de URL y key para que nadie los modifique
-    if (configFields) configFields.style.display = 'none';
-    if (btnMostrar) btnMostrar.style.display = 'inline-flex';
-  } else {
-    status.textContent = '🟡 No conectado — Usando almacenamiento local';
-    status.style.color = '#ca8a04';
-    if (configFields) configFields.style.display = 'block';
-    if (btnMostrar) btnMostrar.style.display = 'none';
-  }
-}
-
 
 function toggleSection(bodyId) {
   const section = document.getElementById('empresaSection');
