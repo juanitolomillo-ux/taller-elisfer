@@ -9,8 +9,8 @@ const CONFIG_KEY = 'taller_elisfer_config';
 // =====================================================
 // CONEXIÓN SUPABASE PERMANENTE (oculta al público)
 // =====================================================
-const SUPABASE_URL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3Z3dzaXhzbXBweGliYXl4em9yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1OTE0NTYsImV4cCI6MjEwNTE2NzQ1Nn0.GMCXMDpvqBfycI9FXBeri-ixUae4U8h9MqqPXkcqKZg';
-const SUPABASE_ANON_KEY = 'sb_publishable_xgnq_OViYDFk-LPvaWrKWw_7f9pXH1I';
+const SUPABASE_URL = 'https://kwgwsixsmppxibayxzor.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3Z3dzaXhzbXBweGliYXl4em9yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1OTE0NTYsImV4cCI6MjEwNTE2NzQ1Nn0.GMCXMDpvqBfycI9FXBeri-ixUae4U8h9MqqPXkcqKZg';
 
 let logoBase64 = null;
 let ordenActualId = null;
@@ -18,11 +18,23 @@ let supabaseClient = null;
 let useSupabase = false;
 
 function initSupabase() {
-  if (!window.supabase) return false;
+  if (!window.supabase) {
+    console.warn('Librería supabase no cargada aún');
+    return false;
+  }
   try {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     useSupabase = true;
-    console.log('✅ Supabase conectado de forma permanente');
+    console.log('✅ Supabase cliente creado');
+    // Prueba rápida de conexión (no bloquea)
+    supabaseClient.from('ordenes').select('id').limit(1).then(({ error }) => {
+      if (error) {
+        console.error('❌ Error de conexión/tabla Supabase:', error);
+        useSupabase = false;
+      } else {
+        console.log('✅ Supabase OK — tabla ordenes accesible');
+      }
+    });
     return true;
   } catch (e) {
     console.warn('Error al conectar Supabase:', e);
@@ -30,6 +42,7 @@ function initSupabase() {
     return false;
   }
 }
+
 
 
 // ---------- UTILIDADES ----------
@@ -110,19 +123,25 @@ async function saveOrdenToDB(datos) {
         cliente_nombre: datos.clienteNombre,
         matricula: datos.matricula,
         fecha_guardado: new Date().toISOString(),
-        datos: datos   // todo el objeto completo en jsonb
+        datos: datos
       };
 
-      const { error } = await supabaseClient
+      const { data, error } = await supabaseClient
         .from('ordenes')
-        .upsert(row, { onConflict: 'id' });
+        .upsert(row, { onConflict: 'id' })
+        .select();
 
-      if (error) throw error;
-      return true;
+      if (error) {
+        console.error('Error Supabase completo:', error);
+        throw new Error(error.message || JSON.stringify(error));
+      }
+
+      console.log('Guardado en Supabase:', data);
+      return { ok: true, donde: 'Supabase (nube)' };
     } catch (e) {
       console.error('Error guardando en Supabase:', e);
-      alert('Error al guardar en Supabase:\n' + (e.message || e) + '\n\nSe guardará localmente como respaldo.');
-      // cae al localStorage
+      alert('❌ Error al guardar en Supabase:\n\n' + (e.message || e) + '\n\nSe guardará solo en este navegador como respaldo.\nRevisa la consola (F12) para más detalles.');
+      useSupabase = false;
     }
   }
 
@@ -132,8 +151,9 @@ async function saveOrdenToDB(datos) {
   if (idx >= 0) ordenes[idx] = datos;
   else ordenes.push(datos);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ordenes));
-  return true;
+  return { ok: true, donde: 'almacenamiento local (este navegador)' };
 }
+
 
 function getConfig() {
   try {
@@ -377,13 +397,13 @@ async function guardarOrden() {
   }
 
   saveConfig();
-  const ok = await saveOrdenToDB(datos);
-  if (ok) {
+  const resultado = await saveOrdenToDB(datos);
+  if (resultado && resultado.ok) {
     ordenActualId = datos.id;
-    const donde = useSupabase ? 'Supabase (nube)' : 'almacenamiento local';
-    alert(`✅ Orden guardada correctamente en ${donde}.\nNº ${datos.ordenNumero}`);
+    alert(`✅ Orden guardada correctamente en ${resultado.donde}.\nNº ${datos.ordenNumero}`);
   }
 }
+
 
 // ---------- BUSCADOR ----------
 function abrirBuscador() {
