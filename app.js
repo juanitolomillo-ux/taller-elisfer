@@ -10,7 +10,7 @@ const CONFIG_KEY = 'taller_elisfer_config';
 // CONEXIÓN SUPABASE PERMANENTE (oculta al público)
 // =====================================================
 const SUPABASE_URL = 'https://kwgwsixsmppxibayxzor.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_xgnq_0V1YDFk-LPvaWrKMw_7f9pXH1I';
+const SUPABASE_ANON_KEY = 'sb_publishable_xgnq_OViYDFk-LPvaWrKWw_7f9pXH1I';
 
 let logoBase64 = null;
 let ordenActualId = null;
