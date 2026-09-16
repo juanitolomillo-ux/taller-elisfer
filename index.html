@@ -31,10 +31,10 @@
       </div>
     </header>
 
-    <!-- CONFIGURACIÓN EMPRESA (colapsable) -->
-    <section class="card collapsible" id="empresaSection">
+    <!-- CONFIGURACIÓN EMPRESA (colapsable) - solo datos del taller -->
+    <section class="card collapsible collapsed" id="empresaSection">
       <div class="card-header" onclick="toggleSection('empresaBody')">
-        <h2>Datos de la Empresa + Conexión Supabase</h2>
+        <h2>Datos de la Empresa</h2>
         <span class="toggle-icon">▼</span>
       </div>
       <div class="card-body" id="empresaBody">
@@ -59,38 +59,10 @@
             <label>Email</label>
             <input type="email" id="empresaEmail" value="contacto@tallerelisfer.cl">
           </div>
-          <div class="form-group">
-            <label>Logo del Taller (opcional)</label>
-            <input type="file" id="logoInput" accept="image/*">
-          </div>
-        </div>
-
-        <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
-
-        <h3 style="font-size: 0.95rem; color: #1a365d; margin-bottom: 10px;">Conexión a la base de datos</h3>
-        
-        <!-- Estado visible siempre -->
-        <div id="supabaseStatusBox" style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
-          <p id="supabaseStatus" style="font-size: 0.9rem; margin:0; font-weight:600; color: #ca8a04;">🟡 Usando almacenamiento local</p>
-          <button type="button" id="btnMostrarConfig" class="btn btn-sm btn-outline" style="display:none; font-size:0.75rem; padding:4px 10px;">⚙️ Cambiar conexión</button>
-        </div>
-
-        <!-- Campos de configuración (se ocultan al conectar) -->
-        <div id="supabaseConfigFields">
-          <div class="grid-2">
-            <div class="form-group">
-              <label>Supabase Project URL</label>
-              <input type="text" id="supabaseUrl" placeholder="https://xxxxxxxx.supabase.co">
-            </div>
-            <div class="form-group">
-              <label>Supabase Publishable / anon key</label>
-              <input type="text" id="supabaseKey" placeholder="sb_publishable_... o eyJ...">
-            </div>
-          </div>
-          <button type="button" class="btn btn-primary" id="btnGuardarSupabase" style="margin-top: 8px;">Conectar Supabase</button>
         </div>
       </div>
     </section>
+
 
 
 
