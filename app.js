@@ -9,10 +9,14 @@ const CONFIG_KEY = 'taller_elisfer_config';
 // =====================================================
 // CONEXIÓN SUPABASE PERMANENTE (oculta al público)
 // =====================================================
+// >>> Cambia este correo: aquí llega el reporte mensual (no se muestra en la web)
+const ADMIN_EMAIL = 'tu-correo@gmail.com';
+
 const SUPABASE_URL = 'https://kwgwsixsmppxibayxzor.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3Z3dzaXhzbXBweGliYXl4em9yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1OTE0NTYsImV4cCI6MjEwNTE2NzQ1Nn0.GMCXMDpvqBfycI9FXBeri-ixUae4U8h9MqqPXkcqKZg';
 
 let logoBase64 = null;
+let ultimoReporte = null; // datos del último reporte generado
 let ordenActualId = null;
 let supabaseClient = null;
 let useSupabase = false;
@@ -175,12 +179,12 @@ function saveConfig() {
 }
 
 function loadConfig() {
-  const c = getConfig();
-  if (c.empresaNombre) document.getElementById('empresaNombre').value = c.empresaNombre;
-  if (c.empresaRut) document.getElementById('empresaRut').value = c.empresaRut;
-  if (c.empresaDireccion) document.getElementById('empresaDireccion').value = c.empresaDireccion;
-  if (c.empresaTel) document.getElementById('empresaTel').value = c.empresaTel;
-  if (c.empresaEmail) document.getElementById('empresaEmail').value = c.empresaEmail;
+  const cfg = getConfig();
+  if (cfg.empresaNombre) document.getElementById('empresaNombre').value = cfg.empresaNombre;
+  if (cfg.empresaRut) document.getElementById('empresaRut').value = cfg.empresaRut;
+  if (cfg.empresaDireccion) document.getElementById('empresaDireccion').value = cfg.empresaDireccion;
+  if (cfg.empresaTel) document.getElementById('empresaTel').value = cfg.empresaTel;
+  if (cfg.empresaEmail) document.getElementById('empresaEmail').value = cfg.empresaEmail;
 }
 
 // Carga automática del logo (archivo fijo: logo.png en la misma carpeta)
@@ -321,6 +325,8 @@ async function limpiarFormulario() {
   document.getElementById('repuestosBody').innerHTML = '';
   document.getElementById('costoDiagnostico').value = 0;
   document.getElementById('costoManoObra').value = 0;
+  document.getElementById('proximaRevisionKm').value = '';
+  document.getElementById('proximaRevisionFecha').value = '';
   document.getElementById('observaciones').value = '';
   document.getElementById('firmaCliente').value = '';
   document.getElementById('firmaTaller').value = document.getElementById('empresaNombre').value || 'TALLER ELISFER';
@@ -347,6 +353,8 @@ function cargarOrden(orden) {
   document.getElementById('kilometraje').value = orden.kilometraje || '';
   document.getElementById('costoDiagnostico').value = orden.costoDiagnostico || 0;
   document.getElementById('costoManoObra').value = orden.costoManoObra || 0;
+  document.getElementById('proximaRevisionKm').value = orden.proximaRevisionKm || '';
+  document.getElementById('proximaRevisionFecha').value = orden.proximaRevisionFecha || '';
   document.getElementById('observaciones').value = orden.observaciones || '';
   document.getElementById('firmaCliente').value = orden.firmaCliente || '';
   document.getElementById('firmaTaller').value = orden.firmaTaller || '';
@@ -387,6 +395,8 @@ function recolectarDatos() {
     subtotal: parseNumber(document.getElementById('subtotal').value),
     iva: parseNumber(document.getElementById('iva').value),
     total: parseNumber(document.getElementById('total').value),
+    proximaRevisionKm: document.getElementById('proximaRevisionKm').value,
+    proximaRevisionFecha: document.getElementById('proximaRevisionFecha').value.trim(),
     observaciones: document.getElementById('observaciones').value.trim(),
     firmaCliente: document.getElementById('firmaCliente').value.trim(),
     firmaTaller: document.getElementById('firmaTaller').value.trim(),
@@ -804,6 +814,28 @@ function generarPDF() {
     obsY += obsLines.length * 4 + 4;
   }
 
+  // ===== PRÓXIMA REVISIÓN =====
+  if (datos.proximaRevisionKm || datos.proximaRevisionFecha) {
+    if (obsY > 250) { doc.addPage(); obsY = 20; }
+    doc.setFillColor(240, 249, 255);
+    doc.roundedRect(m, obsY, pageW - m * 2, 14, 2, 2, 'F');
+    doc.setDrawColor(...accent);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(m, obsY, pageW - m * 2, 14, 2, 2, 'S');
+    doc.setTextColor(...primary);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('PRÓXIMA REVISIÓN / MANTENCIÓN', m + 4, obsY + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...dark);
+    let revTxt = [];
+    if (datos.proximaRevisionKm) revTxt.push('a los ' + formatCLP(datos.proximaRevisionKm) + ' km');
+    if (datos.proximaRevisionFecha) revTxt.push(datos.proximaRevisionFecha);
+    doc.text(revTxt.join('  ·  ') || '—', m + 4, obsY + 11);
+    obsY += 18;
+  }
+
   // ===== FIRMAS =====
   const firmaY = Math.min(Math.max(obsY + 12, 255), 268);
 
@@ -841,6 +873,235 @@ function generarPDF() {
   doc.save(nombreArchivo);
 }
 
+
+// ---------- REPORTE MENSUAL ----------
+const MESES_NOMBRE = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function abrirReporte() {
+  const now = new Date();
+  document.getElementById('reporteMes').value = String(now.getMonth() + 1);
+  document.getElementById('reporteAnio').value = now.getFullYear();
+  document.getElementById('reporteResumen').innerHTML = '<p class="hint">Elige mes y año, luego Generar reporte.</p>';
+  document.getElementById('btnPdfReporte').disabled = true;
+  ultimoReporte = null;
+  document.getElementById('modalReporte').classList.remove('hidden');
+}
+
+function cerrarReporte() {
+  document.getElementById('modalReporte').classList.add('hidden');
+}
+
+function fechaOrdenParaFiltro(o) {
+  // Prioriza fecha de ingreso, luego fecha de guardado
+  const raw = o.fechaIngreso || o.fechaGuardado || '';
+  if (!raw) return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+async function generarReporteMensual() {
+  const mes = parseInt(document.getElementById('reporteMes').value, 10);
+  const anio = parseInt(document.getElementById('reporteAnio').value, 10);
+  const box = document.getElementById('reporteResumen');
+  box.innerHTML = '<p class="hint">Cargando órdenes...</p>';
+
+  const ordenes = await getOrdenes();
+  const filtradas = ordenes.filter(o => {
+    const d = fechaOrdenParaFiltro(o);
+    if (!d) return false;
+    return d.getMonth() + 1 === mes && d.getFullYear() === anio;
+  });
+
+  // Solo órdenes finalizadas cuentan como venta (las canceladas se listan aparte)
+  const ventas = filtradas.filter(o => (o.estado || '') !== 'CANCELADO');
+  const canceladas = filtradas.filter(o => (o.estado || '') === 'CANCELADO');
+
+  const totalIngresos = ventas.reduce((s, o) => s + (parseNumber(o.total) || 0), 0);
+  const totalDiag = ventas.reduce((s, o) => s + (parseNumber(o.costoDiagnostico) || 0), 0);
+  const totalMano = ventas.reduce((s, o) => s + (parseNumber(o.costoManoObra) || 0), 0);
+  const totalRep = ventas.reduce((s, o) => s + (parseNumber(o.costoRepuestos) || 0), 0);
+  const totalIva = ventas.reduce((s, o) => s + (parseNumber(o.iva) || 0), 0);
+
+  ultimoReporte = {
+    mes, anio,
+    mesNombre: MESES_NOMBRE[mes],
+    ventas,
+    canceladas,
+    totalIngresos,
+    totalDiag,
+    totalMano,
+    totalRep,
+    totalIva,
+    cantidad: ventas.length
+  };
+
+  if (filtradas.length === 0) {
+    box.innerHTML = `<p class="hint">No hay órdenes en ${MESES_NOMBRE[mes]} ${anio}.</p>`;
+    document.getElementById('btnPdfReporte').disabled = true;
+    return;
+  }
+
+  const filas = ventas
+    .sort((a, b) => (a.ordenNumero || '').localeCompare(b.ordenNumero || ''))
+    .map(o => {
+      const f = fechaOrdenParaFiltro(o);
+      const fStr = f ? f.toLocaleDateString('es-CL') : '—';
+      return `<tr>
+        <td>${o.ordenNumero || '—'}</td>
+        <td>${fStr}</td>
+        <td>${o.clienteNombre || '—'}</td>
+        <td>${o.matricula || '—'}</td>
+        <td style="text-align:right">$${formatCLP(o.total)}</td>
+      </tr>`;
+    }).join('');
+
+  box.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
+      <div style="background:#f0f9ff;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:0.75rem;color:#64748b;">Órdenes</div>
+        <div style="font-size:1.4rem;font-weight:700;color:#0f172a;">${ventas.length}</div>
+      </div>
+      <div style="background:#ecfdf5;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:0.75rem;color:#64748b;">Ingresos (con IVA)</div>
+        <div style="font-size:1.4rem;font-weight:700;color:#15803d;">$${formatCLP(totalIngresos)}</div>
+      </div>
+      <div style="background:#fefce8;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:0.75rem;color:#64748b;">Mano de obra</div>
+        <div style="font-size:1.1rem;font-weight:700;">$${formatCLP(totalMano)}</div>
+      </div>
+      <div style="background:#fdf4ff;padding:12px;border-radius:8px;text-align:center;">
+        <div style="font-size:0.75rem;color:#64748b;">Repuestos</div>
+        <div style="font-size:1.1rem;font-weight:700;">$${formatCLP(totalRep)}</div>
+      </div>
+    </div>
+    <p style="font-size:0.85rem;margin-bottom:8px;"><strong>${MESES_NOMBRE[mes]} ${anio}</strong>
+      · Diagnóstico: $${formatCLP(totalDiag)} · IVA recaudado: $${formatCLP(totalIva)}
+      ${canceladas.length ? ` · Canceladas: ${canceladas.length}` : ''}
+    </p>
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr><th>Nº</th><th>Fecha</th><th>Cliente</th><th>Patente</th><th>Total</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+  `;
+
+  document.getElementById('btnPdfReporte').disabled = false;
+}
+
+function generarPdfReporte() {
+  if (!ultimoReporte) return;
+  const r = ultimoReporte;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const m = 14;
+  let y = 16;
+  const primary = [15, 23, 42];
+  const accent = [14, 165, 233];
+
+  const emp = document.getElementById('empresaNombre').value || 'TALLER ELISFER';
+
+  doc.setFillColor(...primary);
+  doc.rect(0, 0, pageW, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text(emp, m, 10);
+  doc.setFontSize(10);
+  doc.text(`Reporte de ventas — ${r.mesNombre} ${r.anio}`, m, 17);
+
+  y = 30;
+  doc.setTextColor(...primary);
+  doc.setFontSize(11);
+  doc.text('Resumen del período', m, y);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(40, 40, 40);
+  const resumen = [
+    [`Órdenes de servicio (no canceladas)`, String(r.cantidad)],
+    [`Ingresos totales (con IVA)`, '$ ' + formatCLP(r.totalIngresos)],
+    [`Diagnóstico`, '$ ' + formatCLP(r.totalDiag)],
+    [`Mano de obra`, '$ ' + formatCLP(r.totalMano)],
+    [`Repuestos / materiales`, '$ ' + formatCLP(r.totalRep)],
+    [`IVA 19%`, '$ ' + formatCLP(r.totalIva)],
+    [`Órdenes canceladas`, String(r.canceladas.length)]
+  ];
+  resumen.forEach(([lab, val]) => {
+    doc.text(lab, m, y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(val, pageW - m, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    y += 6;
+  });
+
+  y += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...primary);
+  doc.text('Detalle de órdenes', m, y);
+  y += 4;
+
+  const body = r.ventas.map(o => {
+    const d = fechaOrdenParaFiltro(o);
+    return [
+      o.ordenNumero || '',
+      d ? d.toLocaleDateString('es-CL') : '',
+      o.clienteNombre || '',
+      o.matricula || '',
+      '$ ' + formatCLP(o.total)
+    ];
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [['Nº', 'Fecha', 'Cliente', 'Patente', 'Total']],
+    body,
+    margin: { left: m, right: m },
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: primary, textColor: 255 },
+    columnStyles: {
+      4: { halign: 'right', fontStyle: 'bold' }
+    }
+  });
+
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text(`Generado el ${new Date().toLocaleString('es-CL')} — Uso interno del taller`, m, finalY);
+
+  doc.save(`Reporte_${r.mesNombre}_${r.anio}.pdf`);
+}
+
+
+function abrirMailtoReporte(admin, r) {
+  const asunto = encodeURIComponent(`Reporte ventas ${r.mesNombre} ${r.anio} — Taller`);
+  const cuerpo = encodeURIComponent(
+`Reporte mensual de ventas — ${r.mesNombre} ${r.anio}
+
+Órdenes: ${r.cantidad}
+Ingresos totales (con IVA): $${formatCLP(r.totalIngresos)}
+Diagnóstico: $${formatCLP(r.totalDiag)}
+Mano de obra: $${formatCLP(r.totalMano)}
+Repuestos: $${formatCLP(r.totalRep)}
+IVA: $${formatCLP(r.totalIva)}
+Canceladas: ${r.canceladas.length}
+
+Detalle:
+` + r.ventas.map(o => {
+  const d = fechaOrdenParaFiltro(o);
+  return `Nº ${o.ordenNumero} | ${d ? d.toLocaleDateString('es-CL') : ''} | ${o.clienteNombre || ''} | ${o.matricula || ''} | $${formatCLP(o.total)}`;
+}).join('\n') + `
+
+---
+Reporte de uso interno.`
+  );
+  window.location.href = `mailto:${admin}?subject=${asunto}&body=${cuerpo}`;
+  alert('Se abrió tu correo dirigido a ' + admin + '. Pulsa Enviar.');
+}
+
 // ---------- EVENTOS ----------
 document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar Supabase (conexión permanente, sin UI pública)
@@ -869,6 +1130,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('btnBuscar').addEventListener('click', abrirBuscador);
   document.getElementById('cerrarModal').addEventListener('click', cerrarBuscador);
+  document.getElementById('btnReporte').addEventListener('click', abrirReporte);
+  document.getElementById('cerrarModalReporte').addEventListener('click', cerrarReporte);
+  document.getElementById('btnGenerarReporte').addEventListener('click', generarReporteMensual);
+  document.getElementById('btnPdfReporte').addEventListener('click', generarPdfReporte);
+  document.getElementById('modalReporte').addEventListener('click', e => {
+    if (e.target.id === 'modalReporte') cerrarReporte();
+  });
   document.getElementById('btnDoSearch').addEventListener('click', realizarBusqueda);
   document.getElementById('searchInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') realizarBusqueda();
