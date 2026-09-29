@@ -492,6 +492,57 @@ async function realizarBusqueda() {
     });
   });
 }
+// ---------- PRESUPUESTOS ----------
+function abrirPresupuestos() {
+  document.getElementById('modalPresupuestos').classList.remove('hidden');
+  listarPresupuestos();
+}
+
+function cerrarPresupuestos() {
+  document.getElementById('modalPresupuestos').classList.add('hidden');
+}
+
+async function listarPresupuestos() {
+  const resultsDiv = document.getElementById('presupuestosResults');
+  resultsDiv.innerHTML = '<p class="hint">Cargando presupuestos...</p>';
+
+  const ordenes = await getOrdenes();
+  const presupuestos = ordenes
+    .filter(o => (o.estado || '').toUpperCase() === 'PRESUPUESTO')
+    .sort((a, b) => (b.fechaGuardado || '').localeCompare(a.fechaGuardado || ''));
+
+  if (presupuestos.length === 0) {
+    resultsDiv.innerHTML = '<p class="hint">No hay presupuestos activos.</p>';
+    return;
+  }
+
+  resultsDiv.innerHTML = presupuestos.map(o => {
+    const fecha = o.fechaIngreso ? new Date(o.fechaIngreso).toLocaleDateString('es-CL') : '—';
+    return `
+      <div class="orden-item" data-id="${o.id}">
+        <div>
+          <span class="orden-num">Nº ${o.ordenNumero}</span>
+          <span class="estado-badge estado-PRESUPUESTO">${o.estado || ''}</span>
+        </div>
+        <div class="meta">
+          <strong>${o.clienteNombre || '—'}</strong> · RUT ${o.clienteRut || '—'} · ${o.vehiculo || ''} (${o.matricula || ''})
+        </div>
+        <div class="meta">Ingreso: ${fecha} · Total: $${formatCLP(o.total)}</div>
+      </div>
+    `;
+  }).join('');
+
+  resultsDiv.querySelectorAll('.orden-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      const orden = ordenes.find(o => o.id === id);
+      if (orden) {
+        cargarOrden(orden);
+        cerrarPresupuestos();
+      }
+    });
+  });
+}
 
 // =====================================================
 // PDF — DISEÑO NUEVO Y DISTINTO (moderno y limpio)
@@ -1136,6 +1187,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnPdfReporte').addEventListener('click', generarPdfReporte);
   document.getElementById('modalReporte').addEventListener('click', e => {
     if (e.target.id === 'modalReporte') cerrarReporte();
+  });
+  document.getElementById('btnPresupuestos').addEventListener('click', abrirPresupuestos);
+  document.getElementById('cerrarModalPresupuestos').addEventListener('click', cerrarPresupuestos);
+  document.getElementById('modalPresupuestos').addEventListener('click', e => {
+    if (e.target.id === 'modalPresupuestos') cerrarPresupuestos();
   });
   document.getElementById('btnDoSearch').addEventListener('click', realizarBusqueda);
   document.getElementById('searchInput').addEventListener('keydown', e => {
