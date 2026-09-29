@@ -27,6 +27,7 @@
       </div>
       <div class="header-actions">
         <button type="button" class="btn btn-outline" id="btnBuscar">🔍 Buscar órdenes</button>
+        <button type="button" class="btn btn-outline" id="btnPresupuestos">📋 Ver presupuestos</button>
         <button type="button" class="btn btn-outline" id="btnReporte">📊 Reporte mensual</button>
         <button type="button" class="btn btn-outline" id="btnNueva">+ Nueva orden</button>
       </div>
@@ -79,6 +80,7 @@
           <div class="form-group">
             <label>Estado</label>
             <select id="estado">
+            <option value="PRESUPUESTO">PRESUPUESTO</option>
               <option value="PENDIENTE">PENDIENTE</option>
               <option value="EN PROCESO">EN PROCESO</option>
               <option value="FINALIZADO" selected>FINALIZADO ✓</option>
@@ -324,6 +326,21 @@
           </div>
           <div id="searchResults" class="search-results">
             <p class="hint">Escribe RUT, nombre o patente y presiona Buscar.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+        <!-- MODAL PRESUPUESTOS -->
+    <div id="modalPresupuestos" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>📋 Presupuestos activos</h2>
+          <button type="button" class="btn-close" id="cerrarModalPresupuestos">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="hint" style="margin-bottom:12px;">Solo se muestran órdenes con estado PRESUPUESTO. Al cambiar el estado y guardar, salen de esta lista.</p>
+          <div id="presupuestosResults" class="search-results">
+            <p class="hint">Cargando...</p>
           </div>
         </div>
       </div>
