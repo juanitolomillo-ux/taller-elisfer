@@ -559,6 +559,10 @@ textarea {
   background: #fed7d7;
   color: #c53030;
 }
+.estado-PRESUPUESTO {
+  background: #e9d8fd;
+  color: #553c9a;
+}
 
 /* UTIL */
 .hidden {
