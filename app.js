@@ -10,7 +10,7 @@ const CONFIG_KEY = 'taller_elisfer_config';
 // CONEXIÓN SUPABASE PERMANENTE (oculta al público)
 // =====================================================
 // >>> Cambia este correo: aquí llega el reporte mensual (no se muestra en la web)
-const ADMIN_EMAIL = 'tu-correo@gmail.com';
+const ADMIN_EMAIL = 'Fpacheco.0405@gmail.com';
 
 const SUPABASE_URL = 'https://kwgwsixsmppxibayxzor.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3Z3dzaXhzbXBweGliYXl4em9yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1OTE0NTYsImV4cCI6MjEwNTE2NzQ1Nn0.GMCXMDpvqBfycI9FXBeri-ixUae4U8h9MqqPXkcqKZg';
@@ -330,6 +330,9 @@ async function limpiarFormulario() {
   document.getElementById('observaciones').value = '';
   document.getElementById('firmaCliente').value = '';
   document.getElementById('firmaTaller').value = document.getElementById('empresaNombre').value || 'TALLER ELISFER';
+  const fp = document.getElementById('formaPago');
+  if (fp) fp.value = '';
+  if (typeof actualizarFormaPagoUI === 'function') actualizarFormaPagoUI();
 
   addTrabajo();
   addRepuesto();
@@ -367,6 +370,21 @@ function cargarOrden(orden) {
   (orden.repuestos || []).forEach(r => addRepuesto(r.descripcion, r.cantidad, r.valorUnitario));
   if ((orden.repuestos || []).length === 0) addRepuesto();
 
+  const fp = document.getElementById('formaPago');
+  if (fp) fp.value = orden.formaPago || '';
+  if (orden.transferencia) {
+    const tr = orden.transferencia;
+    if (document.getElementById('transfNombre')) document.getElementById('transfNombre').value = tr.nombre || '';
+    if (document.getElementById('transfRut')) document.getElementById('transfRut').value = tr.rut || '';
+    if (document.getElementById('transfTipoCuenta')) document.getElementById('transfTipoCuenta').value = tr.tipoCuenta || '';
+    if (document.getElementById('transfNumeroCuenta')) document.getElementById('transfNumeroCuenta').value = tr.numeroCuenta || '';
+    if (document.getElementById('transfBanco')) document.getElementById('transfBanco').value = tr.banco || '';
+    if (document.getElementById('transfEmail')) document.getElementById('transfEmail').value = tr.email || '';
+  }
+  if (document.getElementById('comisionDebito') && orden.comisionDebito != null) document.getElementById('comisionDebito').value = orden.comisionDebito;
+  if (document.getElementById('comisionCredito') && orden.comisionCredito != null) document.getElementById('comisionCredito').value = orden.comisionCredito;
+  if (typeof actualizarFormaPagoUI === 'function') actualizarFormaPagoUI();
+
   calcularTotales();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -400,6 +418,17 @@ function recolectarDatos() {
     observaciones: document.getElementById('observaciones').value.trim(),
     firmaCliente: document.getElementById('firmaCliente').value.trim(),
     firmaTaller: document.getElementById('firmaTaller').value.trim(),
+    formaPago: document.getElementById('formaPago')?.value || '',
+    transferencia: {
+      nombre: document.getElementById('transfNombre')?.value.trim() || '',
+      rut: document.getElementById('transfRut')?.value.trim() || '',
+      tipoCuenta: document.getElementById('transfTipoCuenta')?.value.trim() || '',
+      numeroCuenta: document.getElementById('transfNumeroCuenta')?.value.trim() || '',
+      banco: document.getElementById('transfBanco')?.value.trim() || '',
+      email: document.getElementById('transfEmail')?.value.trim() || ''
+    },
+    comisionDebito: parseNumber(document.getElementById('comisionDebito')?.value),
+    comisionCredito: parseNumber(document.getElementById('comisionCredito')?.value),
     empresa: {
       nombre: document.getElementById('empresaNombre').value,
       rut: document.getElementById('empresaRut').value,
@@ -542,6 +571,17 @@ async function listarPresupuestos() {
       }
     });
   });
+}
+
+// ---------- FORMA DE PAGO ----------
+function actualizarFormaPagoUI() {
+  const v = document.getElementById('formaPago')?.value || '';
+  const boxT = document.getElementById('boxTransferencia');
+  const boxTar = document.getElementById('boxTarjeta');
+  const boxE = document.getElementById('boxEfectivo');
+  if (boxT) boxT.style.display = v === 'TRANSFERENCIA' ? 'block' : 'none';
+  if (boxTar) boxTar.style.display = v === 'TARJETA' ? 'block' : 'none';
+  if (boxE) boxE.style.display = v === 'EFECTIVO' ? 'block' : 'none';
 }
 
 // =====================================================
@@ -887,6 +927,45 @@ function generarPDF() {
     obsY += 18;
   }
 
+  // ===== FORMA DE PAGO =====
+  if (datos.formaPago) {
+    if (obsY > 250) { doc.addPage(); obsY = 20; }
+    obsY += 6;
+    doc.setTextColor(...primary);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('FORMA DE PAGO', m, obsY);
+    obsY += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...dark);
+    if (datos.formaPago === 'EFECTIVO') {
+      doc.text('Efectivo — pago presencial con la persona a cargo.', m, obsY);
+      obsY += 6;
+    } else if (datos.formaPago === 'TRANSFERENCIA' && datos.transferencia) {
+      const trf = datos.transferencia;
+      doc.text('Transferencia bancaria', m, obsY); obsY += 5;
+      doc.setTextColor(...muted);
+      doc.setFontSize(8);
+      [
+        'Titular: ' + (trf.nombre || '—'),
+        'RUT: ' + (trf.rut || '—'),
+        'Tipo cuenta: ' + (trf.tipoCuenta || '—'),
+        'Nº cuenta: ' + (trf.numeroCuenta || '—'),
+        'Banco: ' + (trf.banco || '—'),
+        'Email: ' + (trf.email || '—')
+      ].forEach(line => { doc.text(line, m, obsY); obsY += 4.2; });
+      obsY += 2;
+    } else if (datos.formaPago === 'TARJETA') {
+      doc.text('Tarjeta débito/crédito — pago presencial con la persona a cargo.', m, obsY);
+      obsY += 5;
+      doc.setTextColor(...muted);
+      doc.setFontSize(8);
+      doc.text('Comisión débito: ' + (datos.comisionDebito ?? '—') + '%  ·  Comisión crédito: ' + (datos.comisionCredito ?? '—') + '%', m, obsY);
+      obsY += 6;
+    }
+  }
+
   // ===== FIRMAS =====
   const firmaY = Math.min(Math.max(obsY + 12, 255), 268);
 
@@ -1180,6 +1259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   document.getElementById('btnBuscar').addEventListener('click', abrirBuscador);
+  document.getElementById('formaPago')?.addEventListener('change', actualizarFormaPagoUI);
   document.getElementById('cerrarModal').addEventListener('click', cerrarBuscador);
   document.getElementById('btnReporte').addEventListener('click', abrirReporte);
   document.getElementById('cerrarModalReporte').addEventListener('click', cerrarReporte);
