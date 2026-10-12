@@ -4,5 +4,9 @@
       "path": "/api/reporte-mensual",
       "schedule": "0 12 1 * *"
     }
+    {
+      "path": "/api/keepalive",
+      "schedule": "0 15 * * *"
+    }
   ]
 }
